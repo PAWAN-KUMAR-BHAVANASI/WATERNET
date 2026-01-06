@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Waternet – Water Quality Monitoring</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+  --primary:#0077b6;
+  --secondary:#00b4d8;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --success:#2ecc71;
+  --warning:#f39c12;
+  --danger:#e74c3c;
+}
+*{box-sizing:border-box;font-family:Segoe UI,Arial}
+body{margin:0;background:var(--bg);display:flex;height:100vh}
+
+/* SIDEBAR */
+.sidebar{
+  width:240px;
+  background:linear-gradient(180deg,var(--primary),var(--secondary));
+  color:white;
+  padding:20px;
+}
+.sidebar h2{margin-bottom:25px}
+.sidebar button{
+  width:100%;background:none;border:none;color:white;
+  padding:12px;text-align:left;border-radius:6px;cursor:pointer
+}
+.sidebar button:hover{background:rgba(255,255,255,0.15)}
+
+/* MAIN */
+.main{flex:1;padding:25px;overflow:auto}
+.section{display:none}
+.section.active{display:block}
+
+.card{
+  background:var(--card);border-radius:10px;padding:18px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.08);margin-bottom:20px
+}
+.grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:20px
+}
+.value{font-size:26px;font-weight:bold}
+.badge{
+  padding:6px 14px;border-radius:20px;color:white;font-size:14px
+}
+.good{background:var(--success)}
+.bad{background:var(--danger)}
+.warn{background:var(--warning)}
+
+input,button{
+  width:100%;padding:10px;margin-top:8px
+}
+button.primary{
+  background:var(--primary);color:white;border:none;cursor:pointer
+}
+canvas{max-width:100%}
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>💧 Waternet</h2>
+  <button onclick="show('input')">Data Input</button>
+  <button onclick="show('summary')">Water Suitability Summary</button>
+  <button onclick="show('visual')">Water Parameter Visualization</button>
+  <button onclick="show('alerts')">Water Quality Alerts</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- DATA INPUT -->
+<div id="input" class="section active">
+  <h2>Data Input (Manual + File)</h2>
+
+  <div class="grid">
+    <!-- MANUAL -->
+    <div class="card">
+      <h3>Manual Sensor Input</h3>
+      <input id="ph" value="7.2" placeholder="pH">
+      <input id="turbidity" value="2.5" placeholder="Turbidity">
+      <input id="tds" value="420" placeholder="TDS">
+      <input id="hardness" value="180" placeholder="Hardness">
+      <input id="chloride" value="120" placeholder="Chloride">
+      <input id="nitrate" value="10" placeholder="Nitrate">
+      <button class="primary" onclick="analyze()">Analyze</button>
+    </div>
+
+    <!-- FILE -->
+    <div class="card">
+      <h3>File-based Input (CSV)</h3>
+      <input type="file" id="csvFile" accept=".csv">
+      <button class="primary" onclick="loadCSV()">Load CSV</button>
+      <p id="fileStatus">No file loaded</p>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY -->
+<div id="summary" class="section">
+  <h2>Water Suitability Summary</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Drinking Water</h3>
+      <div id="drinkResult" class="value">—</div>
+    </div>
+    <div class="card">
+      <h3>Irrigation Water</h3>
+      <div id="irriResult" class="value">—</div>
+    </div>
+    <div class="card">
+      <h3>WQI</h3>
+      <div id="wqi" class="value">—</div>
+    </div>
+    <div class="card">
+      <h3>IWQI</h3>
+      <div id="iwqi" class="value">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- VISUALIZATION -->
+<div id="visual" class="section">
+  <h2>Water Parameter Visualization</h2>
+  <div class="card">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
+
+<!-- ALERTS -->
+<div id="alerts" class="section">
+  <h2>Water Quality Alerts</h2>
+  <div class="card" id="alertBox">
+    <p>No alerts generated yet.</p>
+  </div>
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+let chart, lastValues=[];
+
+function show(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==="visual" && lastValues.length) drawChart();
+}
+
+function analyze(){
+  lastValues=[
+    +ph.value,+turbidity.value,+tds.value,
+    +hardness.value,+chloride.value,+nitrate.value
+  ];
+
+  const drinkSafe = lastValues[0]>=6.5 && lastValues[0]<=8.5 && lastValues[2]<500;
+  const irriSafe = lastValues[2]<800;
+
+  drinkResult.innerHTML = drinkSafe
+    ? "<span class='badge good'>Safe</span>"
+    : "<span class='badge bad'>Unsafe</span>";
+
+  irriResult.innerHTML = irriSafe
+    ? "<span class='badge good'>Suitable</span>"
+    : "<span class='badge bad'>Unsuitable</span>";
+
+  wqi.innerText = Math.floor(65 + Math.random()*20);
+  iwqi.innerText = Math.floor(70 + Math.random()*20);
+
+  generateAlerts();
+  show("summary");
+}
+
+function generateAlerts(){
+  let alerts=[];
+  if(lastValues[0]<6.5 || lastValues[0]>8.5) alerts.push("⚠ pH out of safe drinking range");
+  if(lastValues[2]>500) alerts.push("⚠ High TDS detected");
+  if(lastValues[5]>45) alerts.push("⚠ Excess nitrate level");
+
+  alertBox.innerHTML = alerts.length
+    ? alerts.map(a=>"<p>"+a+"</p>").join("")
+    : "<p class='badge good'>No critical alerts</p>";
+}
+
+function drawChart(){
+  if(chart) chart.destroy();
+  chart=new Chart(document.getElementById("chart"),{
+    type:"bar",
+    data:{
+      labels:["pH","Turbidity","TDS","Hardness","Chloride","Nitrate"],
+      datasets:[{data:lastValues}]
+    },
+    options:{responsive:true}
+  });
+}
+
+function loadCSV(){
+  const file=document.getElementById("csvFile").files[0];
+  if(!file) return;
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const v=e.target.result.trim().split("\n")[1].split(",");
+    [ph.value,turbidity.value,tds.value,hardness.value,chloride.value,nitrate.value]=v;
+    fileStatus.innerText="CSV loaded successfully";
+  };
+  reader.readAsText(file);
+}
+</script>
+
+</body>
+</html>
